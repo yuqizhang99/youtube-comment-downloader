@@ -56,28 +56,30 @@ def main(argv = None):
             else downloader.get_comments_from_url(youtube_url, args.sort, args.language)
         )
 
-        count = 1
-        with io.open(output, 'w', encoding='utf8') as fp:
+        fp = None
+        count = 0
+        start_time = time.time()
+        comment = next(generator, None)
+
+        while comment:
+            if not fp:
+                fp = io.open(output, 'w', encoding='utf8')
+            if pretty and count == 0:
+                fp.write('{\n' + ' ' * INDENT + '"comments": [\n')
+            comment_str = to_json(comment, indent=INDENT if pretty else None)
+            comment = None if limit and count >= limit else next(generator, None)  # Note that this is the next comment
+            comment_str = comment_str + ',' if pretty and comment is not None else comment_str
+            print(comment_str.decode('utf-8') if isinstance(comment_str, bytes) else comment_str, file=fp)
             sys.stdout.write('Downloaded %d comment(s)\r' % count)
             sys.stdout.flush()
-            start_time = time.time()
+            count += 1
 
-            if pretty:
-                fp.write('{\n' + ' ' * INDENT + '"comments": [\n')
+        if pretty and fp:
+            fp.write(' ' * INDENT +']\n}')
+        if fp:
+            fp.close()
 
-            comment = next(generator, None)
-            while comment:
-                comment_str = to_json(comment, indent=INDENT if pretty else None)
-                comment = None if limit and count >= limit else next(generator, None)  # Note that this is the next comment
-                comment_str = comment_str + ',' if pretty and comment is not None else comment_str
-                print(comment_str.decode('utf-8') if isinstance(comment_str, bytes) else comment_str, file=fp)
-                sys.stdout.write('Downloaded %d comment(s)\r' % count)
-                sys.stdout.flush()
-                count += 1
-
-            if pretty:
-                fp.write(' ' * INDENT +']\n}')
-        print('\n[{:.2f} seconds] Done!'.format(time.time() - start_time))
+        print('\n[{:.2f} seconds] Done!'.format(time.time() - start_time) if count else 'No comment available!')
 
     except Exception as e:
         print('Error:', str(e))
